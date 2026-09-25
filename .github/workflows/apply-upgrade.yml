@@ -1,0 +1,66 @@
+name: Apply Football Paymaster upgrade
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".upgrade/READY"
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Reconstruct source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/football-paymaster-source
+          cat .upgrade/chunk-* | base64 --decode > /tmp/football-paymaster-upgrade.tgz
+          tar -xzf /tmp/football-paymaster-upgrade.tgz -C /tmp/football-paymaster-source
+
+      - name: Restore editable source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf client shared server script
+          cp -R /tmp/football-paymaster-source/client .
+          cp -R /tmp/football-paymaster-source/shared .
+          cp -R /tmp/football-paymaster-source/server .
+          cp -R /tmp/football-paymaster-source/script .
+          for f in package.json package-lock.json components.json vite.config.ts tailwind.config.ts tsconfig.json postcss.config.js drizzle.config.ts .gitignore replit.md; do
+            if [ -f "/tmp/football-paymaster-source/$f" ]; then
+              cp "/tmp/football-paymaster-source/$f" "$f"
+            fi
+          done
+
+      - name: Install and build static app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx vite build
+          test -s dist/public/index.html
+          find dist/public -type f -name '*.js' -size +1c | grep -q .
+          printf '/*    /index.html   200\n' > dist/public/_redirects
+
+      - name: Commit upgraded source and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upgrade
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Upgrade Football Paymaster dashboard and UX"
+          git push
