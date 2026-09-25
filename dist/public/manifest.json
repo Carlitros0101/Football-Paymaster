@@ -1,11 +1,11 @@
 {
-  "name": "Futbolito App",
-  "short_name": "Futbolito",
-  "description": "Gestiona tu pichanga: pagos, jugadores y más",
+  "name": "Football Paymaster",
+  "short_name": "Paymaster",
+  "description": "Organiza partidos, jugadores, pagos, equipos y reportes desde un solo lugar.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f0fdf4",
-  "theme_color": "#34d399",
+  "background_color": "#f4f8f7",
+  "theme_color": "#059669",
   "orientation": "portrait",
   "icons": [
     {
@@ -19,6 +19,6 @@
       "type": "image/png"
     }
   ],
-  "categories": ["sports", "utilities"],
+  "categories": ["sports", "utilities", "finance"],
   "lang": "es"
 }
