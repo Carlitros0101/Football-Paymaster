@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build:netlify"
+  command = "echo 'Using prebuilt Football Paymaster static bundle'"
   publish = "dist/public"
 
 [[redirects]]
