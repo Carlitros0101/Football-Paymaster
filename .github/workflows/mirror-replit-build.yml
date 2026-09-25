@@ -1,0 +1,101 @@
+name: Mirror live Replit build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mirror-replit-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download live static build
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist/public
+          mkdir -p dist/public
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urljoin, urlparse
+          from urllib.request import Request, urlopen
+
+          BASE = "https://football-paymaster--carlosandrespar.replit.app/"
+          OUT = Path("dist/public")
+
+          def fetch(url):
+              req = Request(url, headers={"User-Agent": "Mozilla/5.0 GitHub-Actions-Mirror"})
+              with urlopen(req, timeout=60) as r:
+                  return r.read()
+
+          html = fetch(BASE)
+          (OUT / "index.html").write_bytes(html)
+
+          class Parser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.urls = set()
+              def handle_starttag(self, tag, attrs):
+                  d = dict(attrs)
+                  for key in ("src", "href"):
+                      val = d.get(key)
+                      if val:
+                          self.urls.add(val)
+
+          p = Parser()
+          p.feed(html.decode("utf-8", errors="ignore"))
+          base_host = urlparse(BASE).netloc
+
+          for raw in sorted(p.urls):
+              if raw.startswith(("data:", "mailto:", "javascript:", "#")):
+                  continue
+              url = urljoin(BASE, raw)
+              parsed = urlparse(url)
+              if parsed.netloc != base_host:
+                  continue
+              path = parsed.path
+              if not path or path == "/":
+                  continue
+              target = OUT / path.lstrip("/")
+              target.parent.mkdir(parents=True, exist_ok=True)
+              try:
+                  target.write_bytes(fetch(url))
+                  print(f"Downloaded {path}")
+              except Exception as e:
+                  print(f"Warning: could not download {url}: {e}")
+
+          js = list(OUT.rglob("*.js"))
+          if not js:
+              raise SystemExit("No JavaScript bundle found; refusing to commit an incomplete mirror")
+          print(f"Mirrored {1 + len(list(OUT.rglob('*')))} entries")
+          PY
+
+          printf '/*    /index.html   200\n' > dist/public/_redirects
+
+      - name: Remove temporary transfer fragments
+        shell: bash
+        run: |
+          rm -rf .source
+          rm -f football-paymaster-source.tgz
+          rm -f client/public/favicon.png.base64
+
+      - name: Commit mirrored build
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "Mirror live Football Paymaster build from Replit"
+          git push
